@@ -47,15 +47,17 @@ class SymbolTableFST(StateMachine):
     dec = State()
     undecided_dec = State()
     fun_params = State()
+    before_fun_param_var_dec = State()
+    fun_param_var_dec = State()
     before_fun_body = State()
     ref = State()
 
-    TYPE = enter.to(dec)
-    ID = enter.to(ref) | dec.to(undecided_dec)
-    COMA = undecided_dec.to(dec)
+    TYPE = enter.to(dec) | fun_params.to(before_fun_param_var_dec)
+    ID = enter.to(ref) | dec.to(undecided_dec) | before_fun_param_var_dec.to(fun_param_var_dec)
+    COMA = undecided_dec.to(dec) | fun_param_var_dec.to(fun_params)
     SEMICOLON = undecided_dec.to(enter)
     OPAR = undecided_dec.to(fun_params)
-    CPAR = fun_params.to(before_fun_body)
+    CPAR = fun_params.to(before_fun_body) | fun_param_var_dec.to(before_fun_body)
     OBRACE = before_fun_body.to(enter)
     CBRACE = enter.to(enter)
     AUTOMATIC_TRANSITION = ref.to(enter)
@@ -91,6 +93,9 @@ class SymbolTableFST(StateMachine):
                 self.AUTOMATIC_TRANSITION()
                 return
         raise Exception(f"Reference to a non declared variable {value} at line: {line}")
+
+    def on_enter_fun_param_var_dec(self, *, value: str, line: int) -> None:
+        self.symbol_table_stack[-1][value] = line
 
     def after_CBRACE(self) -> None:
         self.persistent_symbol_tables.append(self.symbol_table_stack.pop())
