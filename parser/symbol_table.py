@@ -2,7 +2,7 @@ from os import path
 from typing import List, Iterator, NamedTuple, Dict, Literal
 from statemachine import StateMachine, State
 
-Token = NamedTuple("Token", [("kind", str), ("value", str), ("line_nbr", int)])
+Token = NamedTuple("Token", [("kind", str), ("value", str | None), ("line_nbr", int)])
 Reference = NamedTuple("Reference", [("line", int), ("ref", str), ("declaration", int)])
 
 
@@ -11,6 +11,8 @@ def _generate_tokens(file_path: str) -> Iterator[Token]:
 
     Each line in the provided file should be of the following format:
         <KIND,VALUE,LINE>
+    or value can be omitted for trivial kinds (such as '{' and '}'):
+        <KIND,LINE>
     KIND is the token's kind (example: KEYWORD).
     VALUE is the token's value (example: function_name).
     LINE is the token's line number in the source file.
@@ -36,7 +38,10 @@ def _generate_tokens(file_path: str) -> Iterator[Token]:
     with open(file_path, "r", encoding="utf8") as tokens:
         for line in tokens:
             values: List[str] = line[1:-1].split(",")
-            yield Token(values[0], values[1], int(values[2]))
+            if len(values) == 3:
+                yield Token(values[0], values[1], int(values[2]))
+            elif len(values) == 2:
+                yield Token(values[0], None, int(values[1]))
 
 
 class SymbolTableFST(StateMachine):
