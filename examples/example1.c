@@ -1,17 +1,8 @@
-int h, i;
-void B(int w) {
-    int j, k;
-    i = 2*w;
-    w = w+1;
-}
-void A(int x, int y) {
-    float i, j;
-    B(h);
-    i = 3;
-}
+int a, b;
 int main() {
-    int a, b;
-    h = 5; a = 3; b = 2;
-    A(a, b);
-    B(h);
+    int c, d;
+    a = 1;
+    b = 2;
+    c = 3;
+    d = 4;
 }
