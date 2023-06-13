@@ -2,7 +2,7 @@
     #define PRINT_TOKEN(NAME, VALUE, LINE) (printf("<%s,%s,%d>\n", NAME, VALUE, LINE))
     #define PRINT_TOKEN_NOVAL(NAME, LINE) (printf("<%s,%d>\n", NAME, LINE))
 %}
-    int num_lines = 0;
+    int num_lines = 1;
 DIGIT           [0-9]
 %%
 void                        |
