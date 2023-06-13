@@ -1,3 +1,4 @@
+import os
 import sys
 import re
 from typing import List, Iterator, NamedTuple, Dict, Literal
@@ -40,6 +41,8 @@ def _generate_tokens() -> Iterator[Token]:
 
 
 class SymbolTableFST(StateMachine):
+    """Finite state machine for generating a symbol table."""
+
     enter = State(initial=True)
     dec = State()
     undecided_dec = State()
@@ -55,35 +58,64 @@ class SymbolTableFST(StateMachine):
     CPAR = fun_params.to(before_fun_body)
     OBRACE = before_fun_body.to(enter)
     CBRACE = enter.to(enter)
+    AUTOMATIC_TRANSITION = ref.to(enter)
 
     def __init__(
         self,
     ) -> None:
         self.symbol_table_stack: List[Dict[str, int]] = []
         self.references_table: List[Reference] = []
-        super(SymbolTableFST, self).__init__()
+        self.symbol_table_stack.append({})
+        super(SymbolTableFST, self).__init__(allow_event_without_transition=True)
 
-    def on_enter_undecided_dec(self, value: str, line: int) -> None:
+    def on_enter_undecided_dec(self, *, value: str, line: int) -> None:
         self.last_id = (value, line)
 
-    def on_exit_undecided_dec(self, kind: str) -> None:
+    def on_exit_undecided_dec(self, *, kind: str) -> None:
         if kind == "OPAR":
             self.symbol_table_stack[-1][self.last_id[0]] = self.last_id[1]
             self.symbol_table_stack.append(dict())
         elif kind in ["SEMICOLON", "COMA"]:
-            self.symbol_table_stack[-1][self.last_id[0]] = self.last_id[-1]
+            self.symbol_table_stack[-1][self.last_id[0]] = self.last_id[1]
 
-    def on_ref_enter(self, value: str, line: int) -> None:
-        for i in range(len(self.symbol_table_stack), -1, -1):
+    def on_enter_ref(self, *, value: str, line: int) -> None:
+        for i in range(len(self.symbol_table_stack) - 1, -1, -1):
             if value in self.symbol_table_stack[i]:
                 self.references_table.append(Reference(line, value, self.symbol_table_stack[i][value]))
+                self.AUTOMATIC_TRANSITION()
                 return
         raise Exception(f"Reference to a non declared variable {value} at line: {line}")
 
     def after_CBRACE(self) -> None:
         self.symbol_table_stack.pop()
 
+    def save_diagram_image(self, path: str | None = None) -> None:
+        diag_img_path: str
+        if path is None:
+            diag_img_path = os.path.abspath(
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "media", "diag_img.png")
+            )
+        else:
+            diag_img_path = path
+        self._graph().write_png(diag_img_path)
+
+    def get_references_table(self) -> List[Reference]:
+        return self.references_table
+
+    def pretty_print_references_table(self) -> None:
+        print("{0:10}{1:20}{2:20}".format("LINE", "REFERENCE", "DECLARATION"))
+        for entry in self.references_table:
+            print(f"{str(entry.line):10}{entry.ref:20}{str(entry.declaration):20}")
+
 
 if __name__ == "__main__":
+    fst = SymbolTableFST()
+    fst.save_diagram_image()
     for token in _generate_tokens():
-        print(token)
+        fst.send(
+            token.kind,
+            kind=token.kind,
+            value=token.value,
+            line=token.line_nbr,
+        )
+    fst.pretty_print_references_table()
