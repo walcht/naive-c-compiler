@@ -63,9 +63,15 @@ class SymbolTableFST(StateMachine):
     def __init__(
         self,
     ) -> None:
+        """Initializes and starts symbol table and references table construction process.
+
+        Parameters:
+        -----------
+        """
         self.symbol_table_stack: List[Dict[str, int]] = []
         self.references_table: List[Reference] = []
         self.symbol_table_stack.append({})
+        self.persistent_symbol_tables: List[Dict[str, int]] = []
         super(SymbolTableFST, self).__init__(allow_event_without_transition=True)
 
     def on_enter_undecided_dec(self, *, value: str, line: int) -> None:
@@ -87,7 +93,7 @@ class SymbolTableFST(StateMachine):
         raise Exception(f"Reference to a non declared variable {value} at line: {line}")
 
     def after_CBRACE(self) -> None:
-        self.symbol_table_stack.pop()
+        self.persistent_symbol_tables.append(self.symbol_table_stack.pop())
 
     def save_diagram_image(self, path: str | None = None) -> None:
         diag_img_path: str
@@ -107,6 +113,11 @@ class SymbolTableFST(StateMachine):
         for entry in self.references_table:
             print(f"{str(entry.line):10}{entry.ref:20}{str(entry.declaration):20}")
 
+    def pretty_print_symbol_table(self) -> None:
+        print("{0:20}{1}".format("OUTER SCOPE", self.symbol_table_stack[0]))
+        for st in self.persistent_symbol_tables:
+            print("{0:20}{1}".format("NAME UNK CURRENTLY", st))
+
 
 if __name__ == "__main__":
     fst = SymbolTableFST()
@@ -118,4 +129,5 @@ if __name__ == "__main__":
             value=token.value,
             line=token.line_nbr,
         )
+    fst.pretty_print_symbol_table()
     fst.pretty_print_references_table()
