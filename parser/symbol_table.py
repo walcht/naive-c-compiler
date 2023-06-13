@@ -1,4 +1,5 @@
-from os import path
+import sys
+import re
 from typing import List, Iterator, NamedTuple, Dict, Literal
 from statemachine import StateMachine, State
 
@@ -6,7 +7,7 @@ Token = NamedTuple("Token", [("kind", str), ("value", str | None), ("line_nbr", 
 Reference = NamedTuple("Reference", [("line", int), ("ref", str), ("declaration", int)])
 
 
-def _generate_tokens(file_path: str) -> Iterator[Token]:
+def _generate_tokens() -> Iterator[Token]:
     """Generates tokens out of a token file.
 
     Each line in the provided file should be of the following format:
@@ -27,21 +28,15 @@ def _generate_tokens(file_path: str) -> Iterator[Token]:
     Token:
         next token in the file if there is any.
     """
-    if not path.isfile(file_path):
-        file_path = path.abspath(file_path)
-        if not path.isfile(file_path):
-            raise ValueError(
-                """
-    Supplied path is not a valid file path.
-    Please supply either a valid absolute or relative filepath."""
-            )
-    with open(file_path, "r", encoding="utf8") as tokens:
-        for line in tokens:
-            values: List[str] = line[1:-1].split(",")
-            if len(values) == 3:
-                yield Token(values[0], values[1], int(values[2]))
-            elif len(values) == 2:
-                yield Token(values[0], None, int(values[1]))
+    reg_pat = re.compile(r"[<>,\s]")
+    for line in sys.stdin:
+        values: List[str] = [t for t in reg_pat.split(line) if t]
+        if len(values) == 3:
+            yield Token(values[0], values[1], int(values[2]))
+        elif len(values) == 2:
+            yield Token(values[0], None, int(values[1]))
+        else:
+            print("Token in wrong string format. Ignoring token...")
 
 
 class SymbolTableFST(StateMachine):
@@ -56,10 +51,10 @@ class SymbolTableFST(StateMachine):
     ID = enter.to(ref) | dec.to(undecided_dec)
     COMA = undecided_dec.to(dec)
     SEMICOLON = undecided_dec.to(enter)
-    OPEN_PAR = undecided_dec.to(fun_params)
-    CLOSE_PAR = fun_params.to(before_fun_body)
-    OPEN_BRACE = before_fun_body.to(enter)
-    CLOSE_BRACE = enter.to(enter)
+    OPAR = undecided_dec.to(fun_params)
+    CPAR = fun_params.to(before_fun_body)
+    OBRACE = before_fun_body.to(enter)
+    CBRACE = enter.to(enter)
 
     def __init__(
         self,
@@ -72,7 +67,7 @@ class SymbolTableFST(StateMachine):
         self.last_id = (value, line)
 
     def on_exit_undecided_dec(self, kind: str) -> None:
-        if kind == "OPEN_PAR":
+        if kind == "OPAR":
             self.symbol_table_stack[-1][self.last_id[0]] = self.last_id[1]
             self.symbol_table_stack.append(dict())
         elif kind in ["SEMICOLON", "COMA"]:
@@ -85,9 +80,10 @@ class SymbolTableFST(StateMachine):
                 return
         raise Exception(f"Reference to a non declared variable {value} at line: {line}")
 
-    def after_CLOSE_BRACE(self) -> None:
+    def after_CBRACE(self) -> None:
         self.symbol_table_stack.pop()
 
 
 if __name__ == "__main__":
-    pass
+    for token in _generate_tokens():
+        print(token)
